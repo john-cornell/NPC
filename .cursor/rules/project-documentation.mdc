@@ -1,0 +1,33 @@
+---
+description: Keep project docs in docs/ accurate when behavior or APIs change
+alwaysApply: true
+---
+
+# Project documentation
+
+## What to maintain
+
+- **`docs/`** — project documentation: what the system is, how it is structured, how to use it.
+- **`README.md`** — short entry point; link into `docs/`, do not duplicate long content.
+
+## What not to put in `docs/`
+
+- Development journals, session notes, or chronological change logs.
+- Agent-only commentary; write for anyone reading the repo.
+
+## When to update
+
+When you add, remove, or change **behavior, public API, or architectural intent**, update the relevant doc in the same change:
+
+| Area | File |
+|------|------|
+| Solution, goals, conventions | `docs/overview.md` |
+| Character, drives, factory | `docs/character.md` |
+
+Add a new `docs/*.md` topic file when a subsystem is large enough to deserve its own page; add a row to the table in `docs/README.md`.
+
+## Style
+
+- Present tense, descriptive (how things work now).
+- Prefer links to source paths over copying large APIs.
+- Keep pages focused; split rather than one growing file.
