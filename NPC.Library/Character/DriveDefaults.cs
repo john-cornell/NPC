@@ -14,8 +14,6 @@ public static class DriveDefaults
         DriveType.Thirst,
         DriveType.Fatigue,
         DriveType.Social,
-        DriveType.Safety,
-        DriveType.Comfort,
     ];
 
     /// <summary>Starting levels for <see cref="Universal"/> drives (healthy, rested baseline).</summary>
@@ -23,11 +21,9 @@ public static class DriveDefaults
         new Dictionary<DriveType, decimal>
         {
             [DriveType.Satiety] = 1.0m,
-            [DriveType.Thirst] = 0m,
-            [DriveType.Fatigue] = 0m,
-            [DriveType.Social] = 0m,
-            [DriveType.Safety] = 0m,
-            [DriveType.Comfort] = 0m,
+            [DriveType.Thirst] = 1.0m, // Start fully hydrated
+            [DriveType.Fatigue] = 0.0m, // Start fully rested
+            [DriveType.Social] = 1.0m, // Start fully fulfilled
         };
 
     /// <summary>Creates drives with all universal types set to <see cref="BaselineLevels"/>.</summary>

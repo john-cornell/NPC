@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Grep|Glob",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\ProgramData\\anaconda3\\python.exe -m codeidx hook pre-grep-glob",
+            "statusMessage": "codeidx: prefer SQLite FTS / symbols over raw Grep/Glob when searching code structure"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "if": "Edit(*.cs)|Write(*.cs)",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\ProgramData\\anaconda3\\python.exe -m codeidx hook post-cs-edit",
+            "statusMessage": "codeidx: after C# saves, add prose to `.codeidx/notes/*.md` via MCP (`get_or_create_note` then `append_note` under `## Notes` — not in `.cs` files)"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "C:\\ProgramData\\anaconda3\\python.exe -m codeidx hook session-start --db C:\\Code\\NPC\\.codeidx\\db\\codeidx.db --repo C:\\Code\\NPC"
+          }
+        ]
+      }
+    ]
+  }
+}

@@ -6,21 +6,18 @@ namespace NPC.Library.Character;
 /// </summary>
 public enum DriveType
 {
-    /// <summary>How satisfied/fueled the body is (from food/rest). Higher = more energy available to spend; lower = need sustenance.</summary>
+    /// <summary>How satisfied/fueled the body is (from food). Higher = more energy available.</summary>
     Satiety,
 
     /// <summary>Need for water. Higher = thirstier.</summary>
     Thirst,
 
-    /// <summary>Wear from activity (running, labor, stress). Higher = more exhausted; distinct from low <see cref="Satiety"/>.</summary>
+    /// <summary>Need for rest. Higher = more tired.</summary>
     Fatigue,
 
-    /// <summary>Need for interaction. Higher = lonelier.</summary>
-    Social,
+    /// <summary>No pressing biological needs. Higher = more bored/restless.</summary>
+    Idle,
 
-    /// <summary>Need for security. Higher = more threatened.</summary>
-    Safety,
-
-    /// <summary>Need for pleasant conditions. Higher = more uncomfortable.</summary>
-    Comfort,
+    /// <summary>Need for social interaction. Lower = more lonely. Higher = more fulfilled.</summary>
+    Social
 }

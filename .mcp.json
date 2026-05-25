@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "codeidx": {
+      "command": "python3",
+      "args": [
+        "-m",
+        "codeidx",
+        "mcp",
+        "--repo",
+        "C:\\Code\\NPC",
+        "--db",
+        "C:\\Code\\NPC\\.codeidx\\db\\codeidx.db"
+      ]
+    }
+  }
+}
