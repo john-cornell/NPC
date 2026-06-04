@@ -7,7 +7,6 @@ using NPC.Library.State;
 
 public class RestActuator : IActuator
 {
-    public int GetPriority(NPC.Library.Character.Character character, DriveType currentDrive) => 50;
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {
@@ -21,10 +20,7 @@ public class RestActuator : IActuator
 
     public Task ExecuteAsync(NPC.Library.Character.Character character)
     {
-        if (character.Drives.TryGetLevel(DriveType.Fatigue, out var currentFatigue))
-        {
-            character.Drives.SetLevel(DriveType.Fatigue, System.Math.Max(0m, currentFatigue - 0.05m));
-        }
+        character.LastAction = "Resting";
         return Task.CompletedTask;
     }
 }

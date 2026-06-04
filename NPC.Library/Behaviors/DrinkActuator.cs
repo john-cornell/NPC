@@ -10,7 +10,7 @@ public class DrinkActuator : IActuator
 {
     public string Name => "Drink";
     public string Description => "Drinking from a water bottle.";
-    public int GetPriority(NPC.Library.Character.Character character, DriveType currentDrive) => 100;
+    bool IActuator.IsPersistent => false;
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {
@@ -35,7 +35,7 @@ public class DrinkActuator : IActuator
                 // Increase thirst level (reduce need)
                 if (character.Drives.TryGetLevel(DriveType.Thirst, out var currentThirst))
                 {
-                    character.Drives[DriveType.Thirst] = System.Math.Min(1.0m, currentThirst + 0.5m);
+                    character.Drives[DriveType.Thirst] = System.Math.Min(1.0m, currentThirst + 0.33m);
                 }
                 if (character.TryGetComponent<NPC.Library.Character.Components.CharacterMetrics>(out var metrics))
                 {

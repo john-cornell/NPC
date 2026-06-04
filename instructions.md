@@ -15,3 +15,6 @@ Whenever you create, modify, or refactor a core type or architecture component (
 ## 2. General Rules
 - Prefer clean, decoupled architecture (e.g., Event-driven, Interfaces).
 - When writing UI code, prioritize smooth redrawing (double-buffering) over raw console clearing to prevent flickering.
+
+## 3. Asset Processing
+- **Sprite Generation:** Always remember to remove the checkerboard/solid backgrounds to set transparency AND resize the sprites properly (e.g., to a 128x128 bounding box) before using them in the project. You can use or adapt existing scripts like `process_sprites.py` to accomplish this.

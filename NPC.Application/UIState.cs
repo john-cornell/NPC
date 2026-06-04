@@ -26,6 +26,8 @@ public class UIState
     
     // For Map View: track selected character
     public Character? SelectedCharacter { get; set; }
+    public Character? PlayerCharacter { get; set; }
+    public bool LockCameraToSelectedCharacter { get; set; } = false;
     public (int X, int Y)? SelectedTree { get; set; }
 
     // Global LLM configuration for characters without a specific override
@@ -41,6 +43,7 @@ public class UIState
     public List<float> DehydrationDeathHistory { get; set; } = new();
     public List<float> StarvationDeathHistory { get; set; } = new();
     public List<float> ExhaustionDeathHistory { get; set; } = new();
+    public List<float> EatenDeathHistory { get; set; } = new();
     public List<float> SurvivedCountHistory { get; set; } = new();
     public List<float> EarliestDeathHistory { get; set; } = new();
     public List<float> LatestDeathHistory { get; set; } = new();
@@ -54,10 +57,33 @@ public class UIState
     public List<float> AvgWaterCollectedHistory { get; set; } = new();
     public List<float> MaxSipsTakenHistory { get; set; } = new();
     public List<float> AvgSipsTakenHistory { get; set; } = new();
+    
+    public List<float> MaxItemsInChestHistory { get; set; } = new();
+    public List<float> AvgItemsInChestHistory { get; set; } = new();
 
     public List<NPC.Library.Decision.NeuralNetwork> CurrentPopulation { get; set; } = new();
+    public List<NPC.Library.Decision.NeuralNetwork> FoxPopulation { get; set; } = new();
+    public List<NPC.Library.Decision.NeuralNetwork> SheepPopulation { get; set; } = new();
 
-    // Speed Control
+    public List<float> FoxAverageFitnessHistory { get; set; } = new();
+    public List<float> FoxBestFitnessHistory { get; set; } = new();
+    public List<float> FoxDeathCountHistory { get; set; } = new();
+    public List<float> FoxDehydrationDeathHistory { get; set; } = new();
+    public List<float> FoxStarvationDeathHistory { get; set; } = new();
+
+    public List<float> SheepAverageFitnessHistory { get; set; } = new();
+    public List<float> SheepBestFitnessHistory { get; set; } = new();
+    public List<float> SheepDeathCountHistory { get; set; } = new();
+    public List<float> SheepDehydrationDeathHistory { get; set; } = new();
+    public List<float> SheepStarvationDeathHistory { get; set; } = new();
+    public List<float> SheepEatenDeathHistory { get; set; } = new();
+
+    // Speed Control & Time
     public bool SlowMode { get; set; } = false;
     public bool SlowModeChanged { get; set; } = false;
+    public System.DateTime CurrentWorldTime { get; set; }
+    public System.DateTime StartWorldTime { get; set; }
+    public decimal CurrentTimeScale { get; set; } = 1.0m;
+    public bool IsTrainerMode { get; set; } = false;
+    public int CurrentGeneration { get; set; } = 1;
 }

@@ -23,14 +23,13 @@ public class VillageSleepInBedActuator : IActuator
         _spatialContext = spatialContext;
     }
 
-    public int GetPriority(Character character, DriveType currentDrive) => 100;
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {
         if (character.TryGetComponent<BedComponent>(out var home))
         {
-            // If another drive takes priority, wake up.
-            if (character.TargetDrive != DriveType.Idle)
+            // If another drive takes priority (like Satiety or Thirst), wake up.
+            if (character.TargetDrive != DriveType.Idle && character.TargetDrive != DriveType.Fatigue)
                 return false;
 
             if (character.Drives.TryGetLevel(DriveType.Fatigue, out var fatigue))
@@ -55,10 +54,6 @@ public class VillageSleepInBedActuator : IActuator
         {
             // At home, sleep
             character.LastAction = "Sleeping in Bed";
-            if (character.Drives.TryGetLevel(DriveType.Fatigue, out var currentFatigue))
-            {
-                character.Drives.SetLevel(DriveType.Fatigue, Math.Max(0m, currentFatigue - 0.15m));
-            }
         }
         else
         {

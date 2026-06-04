@@ -13,16 +13,16 @@ public class GoldfishMemory : IMemory
     private int _capacity = 3; 
 
     // Queue to keep track of chronological order of all memories
-    private readonly Queue<(TileType Type, int X, int Y)> _timeline = new();
+    private readonly Queue<(TileType Type, int X, int Y, int Z)> _timeline = new();
     
     // Fast lookup
-    private readonly Dictionary<TileType, HashSet<(int X, int Y)>> _memory = new();
+    private readonly Dictionary<TileType, HashSet<(int X, int Y, int Z)>> _memory = new();
 
-    public void Remember(TileType type, (int X, int Y) location)
+    public void Remember(TileType type, (int X, int Y, int Z) location)
     {
         if (!_memory.TryGetValue(type, out var locations))
         {
-            locations = new HashSet<(int X, int Y)>();
+            locations = new HashSet<(int X, int Y, int Z)>();
             _memory[type] = locations;
         }
 
@@ -30,31 +30,31 @@ public class GoldfishMemory : IMemory
         if (locations.Contains(location)) return;
 
         locations.Add(location);
-        _timeline.Enqueue((type, location.X, location.Y));
+        _timeline.Enqueue((type, location.X, location.Y, location.Z));
 
         // Enforce capacity constraint
         while (_timeline.Count > _capacity)
         {
             var oldest = _timeline.Dequeue();
-            _memory[oldest.Type].Remove((oldest.X, oldest.Y));
+            _memory[oldest.Type].Remove((oldest.X, oldest.Y, oldest.Z));
         }
     }
 
-    public void Forget(TileType type, int x, int y)
+    public void Forget(TileType type, int x, int y, int z)
     {
         if (_memory.TryGetValue(type, out var locations))
         {
-            locations.Remove((x, y));
+            locations.Remove((x, y, z));
         }
     }
 
-    public IEnumerable<(int X, int Y)> Recall(TileType type)
+    public IEnumerable<(int X, int Y, int Z)> Recall(TileType type)
     {
         if (_memory.TryGetValue(type, out var locations))
         {
             return locations;
         }
-        return Enumerable.Empty<(int X, int Y)>();
+        return Enumerable.Empty<(int X, int Y, int Z)>();
     }
 
     public IDictionary<string, double> GetTunableParameters()
@@ -75,7 +75,7 @@ public class GoldfishMemory : IMemory
             while (_timeline.Count > _capacity)
             {
                 var oldest = _timeline.Dequeue();
-                _memory[oldest.Type].Remove((oldest.X, oldest.Y));
+                _memory[oldest.Type].Remove((oldest.X, oldest.Y, oldest.Z));
             }
         }
     }

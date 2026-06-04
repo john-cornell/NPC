@@ -1,4 +1,5 @@
 using System;
+using System.IO;
 using System.Linq;
 using System.Collections.Generic;
 using System.Threading.Tasks;
@@ -126,9 +127,16 @@ namespace NPC.UI.Isometric
             var maxSipsHistory = new List<float>();
             var avgSipsHistory = new List<float>();
 
+            // Diagnostic logging schedule: gen 1, 3, 5, 10, 20, 50, 60, then every 5 after 60
+            static bool ShouldLog(int g) => g == 1 || g == 3 || g == 5 || g == 10 || g == 20 || g == 50 || g == 60 || (g > 60 && g % 5 == 0);
+            string geneticLogDir = Path.Combine(
+                Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData),
+                "NPC", "GeneticLogs", $"Run_{DateTime.Now:yyyyMMdd_HHmmss}");
+
             for (int gen = 1; gen <= generations; gen++)
             {
-                Console.WriteLine($"Starting Generation {gen}...");
+                bool logThisGen = ShouldLog(gen);
+                Console.WriteLine($"Starting Generation {gen}...{(logThisGen ? " [LOGGING]" : "")}");
                 
                 int width = 200 + (populationSize * 10);
                 int height = 100 + (populationSize * 5);
@@ -137,16 +145,19 @@ namespace NPC.UI.Isometric
                 
                 var dispatcher = new NPC.Library.Messaging.MessageDispatcher();
                 
-                var resolver = new CompositeActionResolver();
-                resolver.AddResolver(new NPC.Village.Behaviors.VillageActuatorGroup(spatialContext, dispatcher));
+                var baseGroup = new NPC.Village.Behaviors.VillageActuatorGroup(spatialContext, dispatcher);
 
-                var stateMachine = new StateMachine(resolver, new NNActionSelector(spatialContext), dispatcher);
-                var engine = new SimulationEngine(stateMachine, spatialContext, dispatcher)
-                {
-                    SatietyDecayPerTick = 0.005m
-                };
+                var stateMachine = new StateMachine(new NNActionSelector(spatialContext), dispatcher);
+                var engine = new SimulationEngine(stateMachine, spatialContext, dispatcher);
                 
                 var visionTracker = new NPC.Library.Simulation.VisionTracker(stateMachine, spatialContext);
+
+                // Diagnostic logger for selected generations
+                GeneticTrainingLogger? genLogger = null;
+                if (logThisGen)
+                {
+                    genLogger = new GeneticTrainingLogger(dispatcher, geneticLogDir, gen, snapshotInterval: 25);
+                }
 
                 var factory = new CharacterFactory(dispatcher);
                 var characters = new List<Character>();
@@ -156,7 +167,29 @@ namespace NPC.UI.Isometric
                     var c = factory.Create();
                     c.Name = $"Clone {i}";
                     
-                    var mem = new NPC.Village.Memory.VillageMemory(wellLocation, doorLocations[i], chestLocations[i], bedLocations[i]);
+                    var mem = new NPC.Village.Memory.VillageMemory((wellLocation.X, wellLocation.Y, 0), (doorLocations[i].X, doorLocations[i].Y, 0), (chestLocations[i].X, chestLocations[i].Y, 0), (bedLocations[i].X, bedLocations[i].Y, 0));
+                    
+                    // Pre-seed some knowledge so they don't start completely blind, with mild variation
+                    var waterTiles = new List<(int X, int Y, int Z)>();
+                    var treeTiles = new List<(int X, int Y, int Z)>();
+                    for (int y = 0; y < map.Height; y++)
+                    {
+                        for (int x = 0; x < map.Width; x++)
+                        {
+                            if (map.Tiles[x, y] == NPC.Library.Spatial.Grid.TileType.Water) waterTiles.Add((x, y, 0));
+                            if (map.Tiles[x, y] == NPC.Library.Spatial.Grid.TileType.AppleTree) treeTiles.Add((x, y, 0));
+                        }
+                    }
+                    
+                    waterTiles = waterTiles.OrderBy(_ => Random.Shared.Next()).ToList();
+                    treeTiles = treeTiles.OrderBy(_ => Random.Shared.Next()).ToList();
+                    
+                    int wCount = Math.Min(waterTiles.Count, Random.Shared.Next(1, 3));
+                    for (int w = 0; w < wCount; w++) mem.Remember(NPC.Library.Spatial.Grid.TileType.Water, waterTiles[w]);
+                    
+                    int tCount = Math.Min(treeTiles.Count, Random.Shared.Next(2, 5));
+                    for (int t = 0; t < tCount; t++) mem.Remember(NPC.Library.Spatial.Grid.TileType.AppleTree, treeTiles[t]);
+                    
                     c.AddComponent<NPC.Library.Memory.IMemory>(mem);
                     
                     var inv = new NPC.Library.Inventory.StandardInventory();
@@ -167,12 +200,16 @@ namespace NPC.UI.Isometric
                     c.AddComponent<NeuralNetwork>(currentPopulation[i]);
                     c.AddComponent(new NPC.Library.Character.Components.CharacterMetrics());
                     
+                    var charResolver = new CompositeActionResolver();
+                    charResolver.AddResolver(baseGroup);
+                    c.AddComponent<NPC.Library.State.IActionResolver>(charResolver);
+                    
                     characters.Add(c);
                     engine.AddCharacter(c);
 
                     var loc = bedLocations[i];
                     c.AddComponent(new NPC.Library.Character.Components.BedComponent(loc.X, loc.Y));
-                    spatialContext.MoveCharacter(c, loc);
+                    spatialContext.MoveCharacter(c, (loc.X, loc.Y, 0));
 
                     if (map.Chests.TryGetValue(chestLocations[i], out var chestInv))
                     {
@@ -200,11 +237,18 @@ namespace NPC.UI.Isometric
                     AvgWaterCollectedHistory = avgWaterColHistory,
                     MaxSipsTakenHistory = maxSipsHistory,
                     AvgSipsTakenHistory = avgSipsHistory,
-                    CurrentPopulation = currentPopulation.ToList()
+                    CurrentPopulation = currentPopulation.ToList(),
+                    IsTrainerMode = true,
+                    CurrentGeneration = gen
                 };
                 engine.OnTickComplete += (sender, e) => 
                 {
                     uiState.TickCount = e.TickCount;
+                    if (genLogger != null)
+                    {
+                        genLogger.UpdateTick(e.TickCount);
+                        genLogger.SnapshotDrives(characters);
+                    }
                 };
 
                 if (!rendererInitialized)
@@ -347,7 +391,15 @@ namespace NPC.UI.Isometric
                 }
 
                 Console.WriteLine($"Generation {gen} finished! Avg: {avgFitness:F2} | Gen Best: {genBest:F2} | Deaths: {deathCount}");
-                
+
+                // Write diagnostic log for this generation if enabled
+                if (genLogger != null)
+                {
+                    genLogger.WriteSummary(characters, evaluatedPop);
+                    genLogger.Dispose();
+                    genLogger = null;
+                }
+
                 currentPopulation = evolutionManager.Evolve(evaluatedPop);
             }
         }

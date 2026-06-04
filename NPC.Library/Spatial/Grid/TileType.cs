@@ -12,5 +12,9 @@ public enum TileType
     Floor,
     Door,
     Chest,
-    Bed
+    Bed,
+    CaveEntrance,
+    StairsUp,
+    CaveFloor,
+    CaveWall
 }

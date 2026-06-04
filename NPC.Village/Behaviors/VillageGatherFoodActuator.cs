@@ -25,11 +25,7 @@ public class VillageGatherFoodActuator : IActuator
         _spatialContext = spatialContext;
     }
 
-    public int GetPriority(NPC.Library.Character.Character character, DriveType currentDrive)
-    {
-        if (currentDrive == DriveType.Satiety) return 50;
-        return 0; // If Idle, it doesn't hijack!
-    }
+
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {
@@ -89,7 +85,7 @@ public class VillageGatherFoodActuator : IActuator
             else
             {
                 character.LastAction = "Failed to Gather (Depleted)";
-                memory.Forget(TileType.AppleTree, targetTree.X, targetTree.Y);
+                memory.Forget(TileType.AppleTree, targetTree.X, targetTree.Y, targetTree.Z);
             }
         }
         else

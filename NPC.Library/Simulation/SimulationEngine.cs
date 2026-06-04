@@ -30,9 +30,22 @@ public sealed class SimulationEngine : IDisposable
     public event EventHandler<SimulationTickedEventArgs>? OnTickComplete;
 
     /// <summary>
-    /// For testing purposes, controls how much Satiety decays per second (tick).
+    /// Multiplier for simulation time. 1.0 = real-time.
     /// </summary>
-    public decimal SatietyDecayPerTick { get; set; } = 0.025m;
+    public decimal TimeScaleMultiplier { get; set; } = 1.0m;
+
+    /// <summary>
+    /// Duration of a single tick in real-world time. Used to calculate decay accurately.
+    /// </summary>
+    public TimeSpan TickDuration { get; set; } = TimeSpan.FromSeconds(1);
+
+    // Decay rates per simulation second (1.0m / total seconds)
+    private const decimal SatietyDecayPerSecond = 1.0m / (5m * 24m * 60m * 60m); // 5 days
+    private const decimal ThirstDecayPerSecond = 1.0m / (2m * 24m * 60m * 60m);  // 2 days
+    private const decimal FatigueDecayPerSecond = 1.0m / (16m * 60m * 60m); // 16 hours to max fatigue
+    private const decimal FatigueRecoveryPerSecond = 1.0m / (8m * 60m * 60m); // 8 hours to fully recover
+
+    private const decimal SocialDecayPerSecond = 1.0m / (4m * 24m * 60m * 60m);  // 4 days
 
     public SimulationEngine(StateMachine stateMachine, ISpatialContext spatialContext, MessageDispatcher? dispatcher = null)
     {
@@ -46,9 +59,22 @@ public sealed class SimulationEngine : IDisposable
     /// </summary>
     public void AddCharacter(Character character)
     {
+        // Initialize character fatigue based on time of day (awake since 06:00)
+        var timeOfDay = _spatialContext.CurrentTime.TimeOfDay;
+        double hoursAwake = timeOfDay.TotalHours - 6.0;
+        
+        // If it's before 6 AM, calculate as if they stayed up all night, or just highly fatigued
+        if (hoursAwake < 0) hoursAwake += 24.0;
+        
+        decimal initialFatigue = Math.Clamp((decimal)(hoursAwake / 16.0), 0.0m, 1.0m);
+        character.Drives.SetLevel(NPC.Library.Character.DriveType.Fatigue, initialFatigue);
+
         lock (_characters)
         {
-            _characters.Add(character);
+            if (!_characters.Contains(character))
+            {
+                _characters.Add(character);
+            }
         }
     }
 
@@ -101,6 +127,16 @@ public sealed class SimulationEngine : IDisposable
 
     private async Task RunLoopAsync(TimeSpan tickInterval, CancellationToken token)
     {
+        if (tickInterval <= TimeSpan.Zero)
+        {
+            while (!token.IsCancellationRequested)
+            {
+                await TickOnceAsync();
+                await Task.Yield();
+            }
+            return;
+        }
+
         using var timer = new PeriodicTimer(tickInterval);
         
         while (await timer.WaitForNextTickAsync(token))
@@ -166,80 +202,97 @@ public sealed class SimulationEngine : IDisposable
 
     private void ApplyPassiveDecay(List<Character> characters)
     {
+        decimal tickSeconds = (decimal)TickDuration.TotalSeconds * TimeScaleMultiplier;
+        decimal satietyDecay = SatietyDecayPerSecond * tickSeconds;
+        decimal thirstDecay = ThirstDecayPerSecond * tickSeconds;
+        
         foreach (var character in characters)
         {
             if (character.IsDead) continue;
 
             if (character.Drives.TryGetLevel(DriveType.Satiety, out var satiety) && satiety <= 0m)
             {
-                character.IsDead = true;
-                character.DeathReason = "Starvation";
-                character.DeathTick = (int)_tickCount;
-                _dispatcher?.DispatchImmediate(new CharacterDiedMessage(character, "Starvation"));
+                Die(character, "Starvation");
                 continue;
             }
 
             if (character.Drives.TryGetLevel(DriveType.Thirst, out var thirst) && thirst <= 0m)
             {
-                character.IsDead = true;
-                character.DeathReason = "Dehydration";
-                character.DeathTick = (int)_tickCount;
-                _dispatcher?.DispatchImmediate(new CharacterDiedMessage(character, "Dehydration"));
+                Die(character, "Dehydration");
                 continue;
             }
 
             // Apply normal decay
             if (character.Drives.TryGetLevel(DriveType.Satiety, out var currentSatiety))
             {
-                var newSatiety = Math.Max(0m, currentSatiety - SatietyDecayPerTick);
+                var newSatiety = Math.Max(0m, currentSatiety - satietyDecay);
                 character.Drives.SetLevel(DriveType.Satiety, newSatiety);
-                if (newSatiety <= 0m)
-                {
-                    character.IsDead = true;
-                    character.DeathReason = "Starvation";
-                    character.DeathTick = (int)_tickCount;
-                    _dispatcher?.DispatchImmediate(new CharacterDiedMessage(character, "Starvation"));
-                }
+                if (newSatiety <= 0m) Die(character, "Starvation");
             }
             
-            // Thirst goes down over time (half as fast as Satiety)
+            // Thirst goes down over time
             if (!character.IsDead && character.Drives.TryGetLevel(DriveType.Thirst, out var currentThirst))
             {
-                var newThirst = Math.Max(0m, currentThirst - (SatietyDecayPerTick * 0.5m));
+                var newThirst = Math.Max(0m, currentThirst - thirstDecay);
                 character.Drives.SetLevel(DriveType.Thirst, newThirst);
-                if (newThirst <= 0m) 
-                {
-                    character.IsDead = true;
-                    character.DeathReason = "Dehydration";
-                    character.DeathTick = (int)_tickCount;
-                    _dispatcher?.DispatchImmediate(new CharacterDiedMessage(character, "Dehydration"));
-                }
+                if (newThirst <= 0m) Die(character, "Dehydration");
             }
 
-            // Fatigue goes UP over time
+            // Fatigue calculation (up if awake, down if asleep)
             if (!character.IsDead && character.Drives.TryGetLevel(DriveType.Fatigue, out var currentFatigue))
             {
-                var newFatigue = Math.Min(1.0m, currentFatigue + (SatietyDecayPerTick * 0.5m));
-                character.Drives.SetLevel(DriveType.Fatigue, newFatigue);
-                if (newFatigue >= 1.0m) 
+                bool isSleeping = character.LastAction != null && (character.LastAction.Contains("Sleep") || character.LastAction.Contains("Rest"));
+
+                if (isSleeping)
                 {
-                    character.IsDead = true;
-                    character.DeathReason = "Exhaustion";
-                    character.DeathTick = (int)_tickCount;
-                    _dispatcher?.DispatchImmediate(new CharacterDiedMessage(character, "Exhaustion"));
+                    decimal fatigueRecovery = FatigueRecoveryPerSecond * tickSeconds;
+                    var newFatigue = Math.Max(0.0m, currentFatigue - fatigueRecovery);
+                    character.Drives.SetLevel(DriveType.Fatigue, newFatigue);
+                    
+                    if (newFatigue <= 0) character.HasBadSleepModifier = false;
+                }
+                else
+                {
+                    // Modifier if they had a bad sleep
+                    decimal fatigueModifier = character.HasBadSleepModifier ? 2.0m : 1.0m;
+                    decimal fatigueDecay = FatigueDecayPerSecond * tickSeconds * fatigueModifier;
+
+                    var newFatigue = Math.Min(1.0m, currentFatigue + fatigueDecay);
+                    character.Drives.SetLevel(DriveType.Fatigue, newFatigue);
+                    
+                    if (newFatigue >= 1.0m) 
+                    {
+                        if (Random.Shared.NextDouble() < 0.05)
+                        {
+                            character.HasBadSleepModifier = true;
+                        }
+                    }
                 }
             }
 
-            // Social goes DOWN over time (slightly faster than thirst, slower than hunger)
+            // Social goes DOWN over time
             if (!character.IsDead && character.Drives.TryGetLevel(DriveType.Social, out var currentSocial))
             {
-                var newSocial = Math.Max(0m, currentSocial - (SatietyDecayPerTick * 0.75m));
+                var newSocial = Math.Max(0m, currentSocial - (SocialDecayPerSecond * tickSeconds));
                 character.Drives.SetLevel(DriveType.Social, newSocial);
+            }
+
+            if (character is NPC.Library.Character.Animal animal)
+            {
+                animal.UpdateDecay(tickSeconds);
             }
         }
         
         // Tick world resources
         _spatialContext.TickEnvironment();
+    }
+
+    private void Die(Character character, string reason)
+    {
+        character.IsDead = true;
+        character.DeathReason = reason;
+        character.DeathTick = (int)_tickCount;
+        _dispatcher?.DispatchImmediate(new CharacterDiedMessage(character, reason));
     }
 
     private async Task SafeTickCharacterAsync(Character character)
@@ -248,6 +301,18 @@ public sealed class SimulationEngine : IDisposable
         
         try
         {
+            if (character.TryGetComponent<NPC.Library.Behaviors.Player.IPlayerController>(out var playerController))
+            {
+                await playerController.TickAsync(character);
+                return;
+            }
+
+            if (character.TryGetComponent<NPC.Library.Behaviors.AI.IAIController>(out var aiController))
+            {
+                await aiController.TickAsync(character);
+                return;
+            }
+
             await _stateMachine.TickAsync(character);
         }
         catch (Exception)

@@ -24,11 +24,7 @@ public class VillageGatherWaterActuator : IActuator
         _spatialContext = spatialContext;
     }
 
-    public int GetPriority(NPC.Library.Character.Character character, DriveType currentDrive)
-    {
-        if (currentDrive == DriveType.Thirst) return 50;
-        return 0;
-    }
+
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {
@@ -93,19 +89,29 @@ public class VillageGatherWaterActuator : IActuator
         {
             // Find a walkable tile adjacent to the targetWater
             var candidates = new[] { 
-                (targetWater.X, targetWater.Y - 1), 
-                (targetWater.X, targetWater.Y + 1), 
-                (targetWater.X - 1, targetWater.Y), 
-                (targetWater.X + 1, targetWater.Y) 
+                (targetWater.X, targetWater.Y - 1, targetWater.Z), 
+                (targetWater.X, targetWater.Y + 1, targetWater.Z), 
+                (targetWater.X - 1, targetWater.Y, targetWater.Z), 
+                (targetWater.X + 1, targetWater.Y, targetWater.Z) 
             };
             
-            var gridCtx = _spatialContext as GridSpatialContext;
-            if (gridCtx == null) return Task.CompletedTask;
+            var gridCtx = _spatialContext as NPC.Library.Spatial.Grid.GridSpatialContext;
+            if (gridCtx == null) 
+            {
+                var fallbackTarget = candidates[0];
+                character.LastAction = "Pathfinding to Water";
+                var fpath = _spatialContext.GetPath(loc.Value, fallbackTarget).ToList();
+                if (fpath.Count > 0) 
+                {
+                    _spatialContext.MoveCharacter(character, fpath[0]);
+                }
+                return Task.CompletedTask;
+            }
 
             var validTargets = candidates.Where(c => 
                 c.Item1 >= 0 && c.Item1 < gridCtx.Map.Width &&
                 c.Item2 >= 0 && c.Item2 < gridCtx.Map.Height &&
-                gridCtx.Map.Tiles[c.Item1, c.Item2] != TileType.Water)
+                gridCtx.Map.Tiles[c.Item1, c.Item2] != NPC.Library.Spatial.Grid.TileType.Water)
                 .OrderBy(c => Math.Abs(c.Item1 - loc.Value.X) + Math.Abs(c.Item2 - loc.Value.Y))
                 .ToList();
 
@@ -113,7 +119,7 @@ public class VillageGatherWaterActuator : IActuator
             {
                 // Unreachable water! Forget it
                 character.LastAction = "Failed to Gather (Unreachable)";
-                memory.Forget(TileType.Water, targetWater.X, targetWater.Y);
+                memory.Forget(NPC.Library.Spatial.Grid.TileType.Water, targetWater.X, targetWater.Y, targetWater.Z);
                 return Task.CompletedTask;
             }
 

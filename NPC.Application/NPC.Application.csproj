@@ -4,6 +4,7 @@
     <ProjectReference Include="..\NPC.Library\NPC.Library.csproj" />
     <ProjectReference Include="..\NPC.Village\NPC.Village.csproj" />
     <ProjectReference Include="..\NPC.LLM\NPC.LLM.csproj" />
+    <ProjectReference Include="..\NPC.World\NPC.World.csproj" />
   </ItemGroup>
 
   <ItemGroup>

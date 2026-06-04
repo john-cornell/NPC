@@ -28,7 +28,6 @@ public class ActuatorExecutedEventArgs : EventArgs
 /// </summary>
 public sealed class StateMachine
 {
-    private readonly IActionResolver _resolver;
     private readonly IActionSelector _selector;
     private readonly NPC.Library.Messaging.MessageDispatcher _dispatcher;
 
@@ -37,9 +36,8 @@ public sealed class StateMachine
     /// </summary>
     public event EventHandler<ActuatorExecutedEventArgs>? OnActuatorExecuted;
 
-    public StateMachine(IActionResolver resolver, IActionSelector selector, NPC.Library.Messaging.MessageDispatcher dispatcher)
+    public StateMachine(IActionSelector selector, NPC.Library.Messaging.MessageDispatcher dispatcher)
     {
-        _resolver = resolver ?? throw new ArgumentNullException(nameof(resolver));
         _selector = selector ?? throw new ArgumentNullException(nameof(selector));
         _dispatcher = dispatcher ?? throw new ArgumentNullException(nameof(dispatcher));
     }
@@ -72,12 +70,6 @@ public sealed class StateMachine
             minLevel = thirstLevel;
         }
 
-        if (drives.TryGetValue(DriveType.Social, out var socialLevel) && socialLevel < minLevel)
-        {
-            targetDrive = DriveType.Social;
-            minLevel = socialLevel;
-        }
-
         // Fatigue is reversed (high level means you are tired), so we flip it to compare.
         // We evaluate it against minLevel so that exhaustion overrides hunger.
         if (drives.TryGetValue(DriveType.Fatigue, out var fatigueLevel))
@@ -90,10 +82,22 @@ public sealed class StateMachine
             }
         }
 
+        // Social is a quality-of-life drive, NOT a survival need.
+        // It should only win against Idle — never outcompete hunger, thirst, or fatigue.
+        if (targetDrive == DriveType.Idle
+            && drives.TryGetValue(DriveType.Social, out var socialLevel) && socialLevel < 0.8m)
+        {
+            targetDrive = DriveType.Social;
+        }
+
         // CRITICAL LETHALITY OVERRIDES
-        // If they are literally about to die of thirst or exhaustion, FORCE them to stop 
+        // If they are literally about to die, FORCE them to stop 
         // whatever they are doing and save themselves. This prevents them from dying while pathfinding.
-        if (drives.TryGetValue(DriveType.Thirst, out var critThirst) && critThirst < 0.15m)
+        if (drives.TryGetValue(DriveType.Satiety, out var critSatiety) && critSatiety < 0.15m)
+        {
+            targetDrive = DriveType.Satiety;
+        }
+        else if (drives.TryGetValue(DriveType.Thirst, out var critThirst) && critThirst < 0.15m)
         {
             targetDrive = DriveType.Thirst;
         }
@@ -124,10 +128,21 @@ public sealed class StateMachine
             return true;
         }
 
-        var available = _resolver.GetAvailableActuators(drive, character)
+        var resolver = character.GetComponent<IActionResolver>();
+        if (resolver == null)
+        {
+            character.ActiveActuator = null;
+            return false;
+        }
+
+        var available = resolver.GetAvailableActuators(drive, character)
                                  .Where(a => a.CanExecute(character));
 
-        var chosen = _selector.Select(available, character, drive);
+        var selectorToUse = character.TryGetComponent<IActionSelector>(out var customSelector) 
+            ? customSelector 
+            : _selector;
+
+        var chosen = selectorToUse.Select(available, character, drive);
         if (chosen != null)
         {
             if (chosen.IsPersistent)

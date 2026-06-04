@@ -73,8 +73,8 @@ public class AStarPathfinder : IPathfinder
         if (x < 0 || x >= _grid.Width || y < 0 || y >= _grid.Height)
             return false;
             
-        // For now, anything but water is walkable
-        return _grid.Tiles[x, y] != TileType.Water;
+        var tile = _grid.Tiles[x, y];
+        return tile != TileType.Water && tile != TileType.Wall && tile != TileType.CaveWall;
     }
 
     private IEnumerable<(int X, int Y)> ReconstructPath(Dictionary<(int X, int Y), (int X, int Y)> cameFrom, (int X, int Y) current)

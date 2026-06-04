@@ -383,7 +383,8 @@ namespace NPC.UI.Isometric
                     if (chestLocs.Any())
                     {
                         var chestLoc = chestLocs.First();
-                        if (state.SpatialContext is GridSpatialContext gridCtx && gridCtx.Map.Chests.TryGetValue(chestLoc, out var chestInv))
+                        var chestLoc2D = (chestLoc.X, chestLoc.Y);
+                        if (state.SpatialContext is GridSpatialContext gridCtx && gridCtx.Map.Chests.TryGetValue(chestLoc2D, out var chestInv))
                         {
                             var items = chestInv.GetItems().ToList();
                             if (!items.Any())

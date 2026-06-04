@@ -7,7 +7,7 @@ using NPC.Library.State;
 
 public class EatActuator : IActuator
 {
-    public int GetPriority(NPC.Library.Character.Character character, DriveType currentDrive) => 100;
+    bool IActuator.IsPersistent => false;
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {
@@ -29,7 +29,7 @@ public class EatActuator : IActuator
                 // Increase satiety
                 if (character.Drives.TryGetLevel(DriveType.Satiety, out var currentSatiety))
                 {
-                    character.Drives[DriveType.Satiety] = System.Math.Min(1.0m, currentSatiety + 0.5m);
+                    character.Drives[DriveType.Satiety] = System.Math.Min(1.0m, currentSatiety + 0.10m);
                 }
                 if (character.TryGetComponent<NPC.Library.Character.Components.CharacterMetrics>(out var metrics))
                 {

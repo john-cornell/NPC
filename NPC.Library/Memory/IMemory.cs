@@ -11,17 +11,17 @@ public interface IMemory
     /// <summary>
     /// Records an observation in the world.
     /// </summary>
-    void Remember(TileType type, (int X, int Y) location);
+    void Remember(TileType type, (int X, int Y, int Z) location);
 
     /// <summary>
     /// Removes a specific location from memory.
     /// </summary>
-    void Forget(TileType type, int x, int y);
+    void Forget(TileType type, int x, int y, int z);
 
     /// <summary>
     /// Retrieves all remembered locations of a specific type.
     /// </summary>
-    IEnumerable<(int X, int Y)> Recall(TileType type);
+    IEnumerable<(int X, int Y, int Z)> Recall(TileType type);
 
     /// <summary>
     /// Retrieves tunable parameters exposed to Genetic Algorithms (e.g., Capacity, DecayRate).

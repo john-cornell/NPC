@@ -24,11 +24,10 @@ public interface IActuator
     /// or the character's primary drive changes. If false, the StateMachine will 
     /// re-evaluate available actuators every tick.
     /// </summary>
-    bool IsPersistent => true;
+    bool IsPersistent => false;
 
     /// <summary>
     /// Higher values denote higher priority when selecting from available actuators.
     /// By providing the targetDrive, actuators can dynamically prioritize themselves (e.g. GatherFood is high priority when hungry, but low priority when idle).
     /// </summary>
-    int GetPriority(Character character, DriveType currentDrive) => 0;
 }

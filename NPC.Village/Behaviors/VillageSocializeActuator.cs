@@ -19,21 +19,17 @@ public class VillageSocializeActuator : IActuator
         _dispatcher = dispatcher;
     }
 
-    public int GetPriority(Character character, DriveType currentDrive)
-    {
-        // Only trigger if Social is our primary target need, or if Idle and slightly lonely
-        if (currentDrive == DriveType.Social) return 60;
-        
-        if (currentDrive == DriveType.Idle && character.Drives.TryGetLevel(DriveType.Social, out var social) && social < 0.9m)
-        {
-            return 20;
-        }
 
-        return 0;
-    }
 
     public bool CanExecute(Character character)
     {
+        // Don't socialize if we are mostly fulfilled socially, UNLESS our primary drive is Social
+        if (character.TargetDrive != DriveType.Social && 
+            character.Drives.TryGetLevel(DriveType.Social, out var social) && social >= 0.8m)
+        {
+            return false;
+        }
+
         var otherLivingChars = _spatialContext.GetCharacters().Where(c => c != character && !c.IsDead).ToList();
         return otherLivingChars.Any();
     }
@@ -48,7 +44,7 @@ public class VillageSocializeActuator : IActuator
         if (otherChars.Count == 0) return Task.CompletedTask;
 
         Character? targetCharacter = null;
-        (int X, int Y)? targetLoc = null;
+        (int X, int Y, int Z)? targetLoc = null;
         int minDistance = int.MaxValue;
 
         foreach (var c in otherChars)
@@ -75,14 +71,14 @@ public class VillageSocializeActuator : IActuator
             character.CurrentDestination = null;
             character.LastAction = $"Socializing with {targetCharacter.Name}";
             
-            // Replenish Social Drive for BOTH characters
+            // Replenish Social Drive for BOTH characters (slower so they chat longer)
             if (character.Drives.TryGetLevel(DriveType.Social, out var mySocial))
             {
-                character.Drives.SetLevel(DriveType.Social, Math.Min(1.0m, mySocial + 0.1m));
+                character.Drives.SetLevel(DriveType.Social, Math.Min(1.0m, mySocial + 0.02m));
             }
             if (targetCharacter.Drives.TryGetLevel(DriveType.Social, out var theirSocial))
             {
-                targetCharacter.Drives.SetLevel(DriveType.Social, Math.Min(1.0m, theirSocial + 0.1m));
+                targetCharacter.Drives.SetLevel(DriveType.Social, Math.Min(1.0m, theirSocial + 0.02m));
             }
 
             // Emit socializing message occasionally so LLM doesn't spam every tick
@@ -106,3 +102,4 @@ public class VillageSocializeActuator : IActuator
         return Task.CompletedTask;
     }
 }
+

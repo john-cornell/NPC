@@ -19,14 +19,20 @@ namespace NPC.Application
         {
             Console.WriteLine($"Starting Genetic Training: {generations} Gens, {populationSize} Pop, {ticksPerGeneration} Ticks");
             
-            var evolutionManager = new GeneticEvolutionManager(populationSize, mutationRate: 0.15f, mutationAmount: 0.3f, elitismRatio: 0.2f);
+            var npcEvolution = new GeneticEvolutionManager(populationSize, mutationRate: 0.15f, mutationAmount: 0.3f, elitismRatio: 0.2f);
+            var foxEvolution = new GeneticEvolutionManager(populationSize, mutationRate: 0.15f, mutationAmount: 0.3f, elitismRatio: 0.2f);
+            var sheepEvolution = new GeneticEvolutionManager(populationSize, mutationRate: 0.15f, mutationAmount: 0.3f, elitismRatio: 0.2f);
             
             // Generate initial random population
-            var currentPopulation = new List<NeuralNetwork>();
+            var popNPC = new List<NeuralNetwork>();
+            var popFox = new List<NeuralNetwork>();
+            var popSheep = new List<NeuralNetwork>();
             for (int i = 0; i < populationSize; i++)
             {
                 // 16 Inputs -> 12 Hidden -> 11 Outputs (Actuators)
-                currentPopulation.Add(new NeuralNetwork(new[] { 16, 12, 11 }));
+                popNPC.Add(new NeuralNetwork(new[] { 16, 12, 11 }));
+                popFox.Add(new NeuralNetwork(new[] { 16, 12, 11 }));
+                popSheep.Add(new NeuralNetwork(new[] { 16, 12, 11 }));
             }
 
             for (int gen = 1; gen <= generations; gen++)
@@ -41,24 +47,34 @@ namespace NPC.Application
                 
                 var dispatcher = new NPC.Library.Messaging.MessageDispatcher();
                 
-                var resolver = new CompositeActionResolver();
-                resolver.AddResolver(new NPC.Village.Behaviors.VillageActuatorGroup(spatialContext, dispatcher));
+                var baseGroup = new NPC.Village.Behaviors.VillageActuatorGroup(spatialContext, dispatcher);
 
-                var stateMachine = new StateMachine(resolver, new NNActionSelector(spatialContext), dispatcher);
-                var engine = new SimulationEngine(stateMachine, spatialContext, dispatcher)
-                {
-                    SatietyDecayPerTick = 0.005m
-                };
+                var stateMachine = new StateMachine(new NNActionSelector(spatialContext), dispatcher);
+                var engine = new SimulationEngine(stateMachine, spatialContext, dispatcher);
 
                 var factory = new CharacterFactory(dispatcher);
-                var characters = new List<Character>();
+                var animalResolver = new CompositeActionResolver();
+                animalResolver.AddResolver(new NPC.Library.State.SimpleActuatorGroup(new List<IActuator> {
+                    new NPC.Library.Behaviors.SheepGrazeActuator(spatialContext),
+                    new NPC.Library.Behaviors.SheepFleeActuator(spatialContext),
+                    new NPC.Library.Behaviors.FoxHuntActuator(spatialContext),
+                    new NPC.Library.Behaviors.FoxEatActuator(spatialContext),
+                    new NPC.Library.Behaviors.AnimalSleepActuator(),
+                    new NPC.Library.Behaviors.AnimalDrinkActuator(spatialContext)
+                }));
+
+                var npcs = new List<Character>();
+                var foxes = new List<Character>();
+                var sheeps = new List<Character>();
+                var random = new Random();
 
                 for (int i = 0; i < populationSize; i++)
                 {
+                    // Spawn NPC
                     var c = factory.Create();
-                    c.Name = $"Clone {i}";
+                    c.Name = $"NPC {i}";
                     
-                    var mem = new NPC.Village.Memory.VillageMemory(wellLocation, doorLocations[i], chestLocations[i], bedLocations[i]);
+                    var mem = new NPC.Village.Memory.VillageMemory((wellLocation.X, wellLocation.Y, 0), (doorLocations[i].X, doorLocations[i].Y, 0), (chestLocations[i].X, chestLocations[i].Y, 0), (bedLocations[i].X, bedLocations[i].Y, 0));
                     c.AddComponent<NPC.Library.Memory.IMemory>(mem);
                     
                     var inv = new NPC.Library.Inventory.StandardInventory();
@@ -66,21 +82,35 @@ namespace NPC.Application
                     inv.AddItem(new NPC.Library.Inventory.Item(NPC.Library.Inventory.ItemType.Apple));
                     c.AddComponent<NPC.Library.Inventory.IInventory>(inv);
                     
-                    // Assign the specific neural network to this clone
-                    var brain = currentPopulation[i];
-                    c.AddComponent<NeuralNetwork>(brain);
+                    var charResolver = new CompositeActionResolver();
+                    charResolver.AddResolver(baseGroup);
+                    c.AddComponent<NPC.Library.State.IActionResolver>(charResolver);
+                    c.AddComponent<NeuralNetwork>(popNPC[i]);
                     
-                    characters.Add(c);
+                    npcs.Add(c);
                     engine.AddCharacter(c);
-
                     var loc = bedLocations[i];
                     c.AddComponent(new NPC.Library.Character.Components.BedComponent(loc.X, loc.Y));
-                    spatialContext.MoveCharacter(c, loc);
+                    spatialContext.MoveCharacter(c, (loc.X, loc.Y, 0));
 
                     if (map.Chests.TryGetValue(chestLocations[i], out var chestInv))
-                    {
                         chestInv.AddItem(new NPC.Library.Inventory.WaterBottleItem(0));
-                    }
+
+                    // Spawn Fox
+                    var fox = new Animal($"Fox {i}", AnimalType.Fox);
+                    fox.AddComponent<NPC.Library.State.IActionResolver>(animalResolver);
+                    fox.AddComponent<NeuralNetwork>(popFox[i]);
+                    foxes.Add(fox);
+                    engine.AddCharacter(fox);
+                    spatialContext.MoveCharacter(fox, (random.Next(width), random.Next(height), 0));
+
+                    // Spawn Sheep
+                    var sheep = new Animal($"Sheep {i}", AnimalType.Sheep);
+                    sheep.AddComponent<NPC.Library.State.IActionResolver>(animalResolver);
+                    sheep.AddComponent<NeuralNetwork>(popSheep[i]);
+                    sheeps.Add(sheep);
+                    engine.AddCharacter(sheep);
+                    spatialContext.MoveCharacter(sheep, (random.Next(width), random.Next(height), 0));
                 }
 
                 // Run fast-forward simulation
@@ -88,75 +118,79 @@ namespace NPC.Application
                 {
                     await engine.TickOnceAsync();
                     
-                    // If all died, end early
-                    if (characters.All(c => c.IsDead)) break;
+                    // If all villagers died, end early
+                    if (npcs.All(c => c.IsDead)) break;
                 }
 
                 // Evaluate Fitness
-                var evaluatedPop = new List<(NeuralNetwork Brain, float Fitness)>();
-                float totalFitness = 0;
+                var evalNPC = new List<(NeuralNetwork Brain, float Fitness)>();
+                var evalFox = new List<(NeuralNetwork Brain, float Fitness)>();
+                var evalSheep = new List<(NeuralNetwork Brain, float Fitness)>();
+                
+                float totalFitnessNPC = 0;
+                float totalFitnessFox = 0;
+                float totalFitnessSheep = 0;
                 
                 for (int i = 0; i < populationSize; i++)
                 {
-                    var c = characters[i];
-                    var loc = spatialContext.GetCharacterLocation(c);
-                    
-                    // Fitness heuristic:
-                    // 1 point per tick lived.
-                    // Bonus points for remaining satiety and thirst if survived to the end.
-                    float fitness = c.IsDead ? c.DeathTick : ticksPerGeneration;
-                    
+                    // NPC Fitness
+                    var c = npcs[i];
+                    float fNPC = c.IsDead ? c.DeathTick : ticksPerGeneration;
                     if (!c.IsDead)
                     {
-                        if (c.Drives.TryGetLevel(NPC.Library.Character.DriveType.Satiety, out var satiety)) fitness += (float)satiety * 100;
-                        if (c.Drives.TryGetLevel(NPC.Library.Character.DriveType.Thirst, out var thirst)) fitness += (float)thirst * 100;
+                        if (c.Drives.TryGetLevel(NPC.Library.Character.DriveType.Satiety, out var satiety)) fNPC += (float)satiety * 100;
+                        if (c.Drives.TryGetLevel(NPC.Library.Character.DriveType.Thirst, out var thirst)) fNPC += (float)thirst * 100;
                     }
                     else
                     {
-                        // Proximity bonus to well to encourage movement and break the 101 flatline
+                        var loc = spatialContext.GetCharacterLocation(c);
                         if (loc.HasValue)
                         {
                             float distX = Math.Abs(loc.Value.X - wellLocation.X);
                             float distY = Math.Abs(loc.Value.Y - wellLocation.Y);
-                            float dist = (float)Math.Sqrt(distX * distX + distY * distY);
-                            
-                            // Give up to 50 points for getting closer to the well
-                            float bonus = 50f - Math.Min(dist, 50f);
-                            if (bonus > 0) fitness += bonus;
-                        }
-
-                        // Proximity bonus to Apple Trees to encourage finding food
-                        if (loc.HasValue)
-                        {
-                            float closestTreeDist = float.MaxValue;
-                            foreach (var treeLoc in spatialContext.Map.TreeApples.Keys)
-                            {
-                                if (spatialContext.Map.TreeApples[treeLoc] > 0)
-                                {
-                                    float dx = Math.Abs(loc.Value.X - treeLoc.X);
-                                    float dy = Math.Abs(loc.Value.Y - treeLoc.Y);
-                                    float d = (float)Math.Sqrt(dx * dx + dy * dy);
-                                    if (d < closestTreeDist) closestTreeDist = d;
-                                }
-                            }
-
-                            if (closestTreeDist < 50f)
-                            {
-                                float appleBonus = 50f - closestTreeDist;
-                                if (appleBonus > 0) fitness += appleBonus;
-                            }
+                            float bonus = 50f - Math.Min((float)Math.Sqrt(distX*distX + distY*distY), 50f);
+                            if (bonus > 0) fNPC += bonus;
                         }
                     }
-                    
-                    evaluatedPop.Add((currentPopulation[i], fitness));
-                    totalFitness += fitness;
+                    evalNPC.Add((popNPC[i], fNPC));
+                    totalFitnessNPC += fNPC;
+
+                    // Fox Fitness
+                    var fox = foxes[i];
+                    float fFox = fox.IsDead ? fox.DeathTick : ticksPerGeneration;
+                    if (!fox.IsDead)
+                    {
+                        if (fox.Drives.TryGetLevel(NPC.Library.Character.DriveType.Satiety, out var satiety)) fFox += (float)satiety * 100;
+                        if (fox.Drives.TryGetLevel(NPC.Library.Character.DriveType.Thirst, out var thirst)) fFox += (float)thirst * 100;
+                    }
+                    evalFox.Add((popFox[i], fFox));
+                    totalFitnessFox += fFox;
+
+                    // Sheep Fitness
+                    var sheep = sheeps[i];
+                    float fSheep = sheep.IsDead ? sheep.DeathTick : ticksPerGeneration;
+                    if (!sheep.IsDead)
+                    {
+                        if (sheep.Drives.TryGetLevel(NPC.Library.Character.DriveType.Satiety, out var satiety)) fSheep += (float)satiety * 100;
+                        if (sheep.Drives.TryGetLevel(NPC.Library.Character.DriveType.Thirst, out var thirst)) fSheep += (float)thirst * 100;
+                    }
+                    evalSheep.Add((popSheep[i], fSheep));
+                    totalFitnessSheep += fSheep;
                 }
 
-                Console.WriteLine($"Average Fitness: {totalFitness / populationSize:F2} | Best All-Time: {evolutionManager.BestEverFitness:F2}");
+                Console.WriteLine($"NPC Avg: {totalFitnessNPC / populationSize:F2} | Fox Avg: {totalFitnessFox / populationSize:F2} | Sheep Avg: {totalFitnessSheep / populationSize:F2}");
                 
                 // Breed next generation
-                currentPopulation = evolutionManager.Evolve(evaluatedPop);
+                popNPC = npcEvolution.Evolve(evalNPC);
+                popFox = foxEvolution.Evolve(evalFox);
+                popSheep = sheepEvolution.Evolve(evalSheep);
             }
+            
+            // Save the best networks
+            System.IO.File.WriteAllText("genes_npc.json", System.Text.Json.JsonSerializer.Serialize(new List<NeuralNetwork> { npcEvolution.BestEverNetwork }));
+            System.IO.File.WriteAllText("genes_fox.json", System.Text.Json.JsonSerializer.Serialize(new List<NeuralNetwork> { foxEvolution.BestEverNetwork }));
+            System.IO.File.WriteAllText("genes_sheep.json", System.Text.Json.JsonSerializer.Serialize(new List<NeuralNetwork> { sheepEvolution.BestEverNetwork }));
+            Console.WriteLine("Saved genes_npc.json, genes_fox.json, genes_sheep.json");
             
             Console.WriteLine("Training Complete!");
         }

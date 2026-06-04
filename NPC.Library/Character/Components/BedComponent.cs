@@ -2,10 +2,10 @@ namespace NPC.Library.Character.Components;
 
 public class BedComponent
 {
-    public (int X, int Y) Location { get; }
+    public (int X, int Y, int Z) Location { get; }
 
-    public BedComponent(int x, int y)
+    public BedComponent(int x, int y, int z = 0)
     {
-        Location = (x, y);
+        Location = (x, y, z);
     }
 }

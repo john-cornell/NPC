@@ -145,7 +145,8 @@ public class LLMReasoningService
                 if (chestLocs.Any())
                 {
                     var chestLoc = chestLocs.First();
-                    if (_spatialContext is GridSpatialContext gridCtx && gridCtx.Map.Chests.TryGetValue(chestLoc, out var chestInv))
+                    var chestLoc2D = (chestLoc.X, chestLoc.Y);
+                    if (_spatialContext is GridSpatialContext gridCtx && gridCtx.Map.Chests.TryGetValue(chestLoc2D, out var chestInv))
                     {
                         var chestItems = chestInv.GetItems();
                         if (chestItems.Any())

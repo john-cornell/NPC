@@ -9,5 +9,9 @@ public enum ItemType
     Apple,
     WaterBottle,
     Wood,
-    Stone
+    Stone,
+    Meat,
+    Dagger,
+    LightHealingPotion,
+    Gold
 }

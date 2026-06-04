@@ -17,14 +17,13 @@ using NPC.Library.State;
 
 public class VillageStoreItemActuator : IActuator
 {
-    private readonly GridSpatialContext _spatialContext;
+    private readonly ISpatialContext _spatialContext;
 
-    public VillageStoreItemActuator(GridSpatialContext spatialContext)
+    public VillageStoreItemActuator(ISpatialContext spatialContext)
     {
         _spatialContext = spatialContext;
     }
 
-    public int GetPriority(Character character, DriveType currentDrive) => 50;
 
     public bool CanExecute(Character character)
     {
@@ -70,7 +69,8 @@ public class VillageStoreItemActuator : IActuator
         else
         {
             character.LastAction = "Storing Items in Chest";
-            if (_spatialContext.Map.Chests.TryGetValue(chestLoc, out var chestInv))
+            var chestInv = _spatialContext.GetChest(chestLoc);
+            if (chestInv != null)
             {
                 var items = inv.GetItems().ToList();
                 var bottles = items.OfType<WaterBottleItem>().ToList();

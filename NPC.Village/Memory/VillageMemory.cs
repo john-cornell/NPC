@@ -13,15 +13,15 @@ using NPC.Library.Spatial.Grid;
 /// </summary>
 public class VillageMemory : IMemory
 {
-    private readonly HashSet<(int X, int Y)> _wells = new();
-    private readonly HashSet<(int X, int Y)> _doors = new();
-    private readonly HashSet<(int X, int Y)> _chests = new();
-    private readonly HashSet<(int X, int Y)> _beds = new();
+    private readonly HashSet<(int X, int Y, int Z)> _wells = new();
+    private readonly HashSet<(int X, int Y, int Z)> _doors = new();
+    private readonly HashSet<(int X, int Y, int Z)> _chests = new();
+    private readonly HashSet<(int X, int Y, int Z)> _beds = new();
     
-    private readonly Dictionary<TileType, Queue<(int X, int Y)>> _dynamicMemory = new();
+    private readonly Dictionary<TileType, Queue<(int X, int Y, int Z)>> _dynamicMemory = new();
     private int _capacity = 10;
 
-    public VillageMemory((int X, int Y) wellLocation, (int X, int Y) doorLocation, (int X, int Y) chestLocation, (int X, int Y) bedLocation)
+    public VillageMemory((int X, int Y, int Z) wellLocation, (int X, int Y, int Z) doorLocation, (int X, int Y, int Z) chestLocation, (int X, int Y, int Z) bedLocation)
     {
         _wells.Add(wellLocation);
         _doors.Add(doorLocation);
@@ -29,13 +29,13 @@ public class VillageMemory : IMemory
         _beds.Add(bedLocation);
     }
 
-    public void Remember(TileType type, (int X, int Y) location)
+    public void Remember(TileType type, (int X, int Y, int Z) location)
     {
         if (type == TileType.Well || type == TileType.Door || type == TileType.Chest || type == TileType.Bed) return;
 
         if (!_dynamicMemory.TryGetValue(type, out var queue))
         {
-            queue = new Queue<(int X, int Y)>();
+            queue = new Queue<(int X, int Y, int Z)>();
             _dynamicMemory[type] = queue;
         }
 
@@ -49,21 +49,21 @@ public class VillageMemory : IMemory
         }
     }
 
-    public void Forget(TileType type, int x, int y)
+    public void Forget(TileType type, int x, int y, int z)
     {
         if (type == TileType.Well || type == TileType.Door || type == TileType.Chest || type == TileType.Bed) return;
         
         if (_dynamicMemory.TryGetValue(type, out var queue))
         {
             var items = queue.ToList();
-            if (items.Remove((x, y)))
+            if (items.Remove((x, y, z)))
             {
-                _dynamicMemory[type] = new Queue<(int X, int Y)>(items);
+                _dynamicMemory[type] = new Queue<(int X, int Y, int Z)>(items);
             }
         }
     }
 
-    public IEnumerable<(int X, int Y)> Recall(TileType type)
+    public IEnumerable<(int X, int Y, int Z)> Recall(TileType type)
     {
         if (type == TileType.Well) return _wells;
         if (type == TileType.Door) return _doors;
@@ -74,7 +74,7 @@ public class VillageMemory : IMemory
         {
             return queue;
         }
-        return Array.Empty<(int X, int Y)>();
+        return Array.Empty<(int X, int Y, int Z)>();
     }
 
     public IDictionary<string, double> GetTunableParameters()

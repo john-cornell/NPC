@@ -15,9 +15,9 @@ public static class VillageMapGenerator
     /// Generates a grid, places the village with a well and houses, and returns a list of house locations so 
     /// callers can assign a BedComponent to each NPC.
     /// </summary>
-    public static MapGrid Generate(int width, int height, int npcCount, out List<(int X, int Y)> bedLocations, out List<(int X, int Y)> doorLocations, out List<(int X, int Y)> chestLocations, out (int X, int Y) wellLocation, Random? rng = null)
+    public static MapGrid Generate(int width, int height, int npcCount, out List<(int X, int Y)> bedLocations, out List<(int X, int Y)> doorLocations, out List<(int X, int Y)> chestLocations, out (int X, int Y) wellLocation, Random? rng = null, double noiseOffsetX = 0, double noiseOffsetY = 0)
     {
-        rng ??= new Random(1337);
+        rng ??= new Random();
         var map = new MapGrid(width, height);
 
         // 1. Fill with grass
@@ -55,7 +55,7 @@ public static class VillageMapGenerator
 
                 if (distFromCenter > 0.55)
                 {
-                    double noise = PerlinNoise.Noise(x * scale, y * scale);
+                    double noise = PerlinNoise.Noise((x + noiseOffsetX) * scale, (y + noiseOffsetY) * scale);
                     if (noise < -0.1)
                         map.Tiles[x, y] = TileType.Water;
                 }
@@ -66,8 +66,13 @@ public static class VillageMapGenerator
         bedLocations = new List<(int X, int Y)>();
         doorLocations = new List<(int X, int Y)>();
         chestLocations = new List<(int X, int Y)>();
-        int clusterW = Math.Min(width - 10, 60);
-        int clusterH = Math.Min(height - 10, 40);
+        
+        // Scale the cluster size dynamically based on npcCount so we don't cap out
+        int targetWidth = 60 + (npcCount * 2);
+        int targetHeight = 40 + (npcCount * 2);
+        int clusterW = Math.Min(width - 10, targetWidth);
+        int clusterH = Math.Min(height - 10, targetHeight);
+        
         int clusterX = (width - clusterW) / 2;
         int clusterY = (height - clusterH) / 2;
 

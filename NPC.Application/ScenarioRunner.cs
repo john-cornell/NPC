@@ -32,7 +32,7 @@ namespace NPC.Application
             var spatialContext = new GridSpatialContext(map);
             services.AddSingleton<ISpatialContext>(spatialContext);
 
-            services.AddSingleton<IActionSelector, PriorityActionSelector>();
+            services.AddSingleton<IActionSelector, RandomActionSelector>();
             
             var resolver = new CompositeActionResolver();
             resolver.AddResolver(new NPC.Library.Behaviors.SurvivalActuatorGroup(spatialContext));
@@ -44,10 +44,7 @@ namespace NPC.Application
             {
                 var machine = provider.GetRequiredService<StateMachine>();
                 var ctx = provider.GetRequiredService<ISpatialContext>();
-                return new SimulationEngine(machine, ctx)
-                {
-                    SatietyDecayPerTick = 0.005m
-                };
+                return new SimulationEngine(machine, ctx);
             });
 
             services.AddSingleton<NPC.Library.Simulation.VisionTracker>();
@@ -106,7 +103,12 @@ namespace NPC.Application
                 var loc = spatialContext.GetRandomWalkableLocation();
                 map.Tiles[loc.X, loc.Y] = TileType.House;
                 c.AddComponent(new NPC.Library.Character.Components.BedComponent(loc.X, loc.Y));
-                spatialContext.MoveCharacter(c, loc);
+                
+                var charResolver = new CompositeActionResolver();
+                charResolver.AddResolver(new NPC.Library.Behaviors.SurvivalActuatorGroup(spatialContext));
+                c.AddComponent<NPC.Library.State.IActionResolver>(charResolver);
+                
+                spatialContext.MoveCharacter(c, (loc.X, loc.Y, 0));
             }
 
             PlaceCharacter(char1);
@@ -140,19 +142,12 @@ namespace NPC.Application
             }
             else
             {
-                services.AddSingleton<IActionSelector, PriorityActionSelector>();
+                services.AddSingleton<IActionSelector, RandomActionSelector>();
             }
             
             services.AddSingleton<NPC.Library.Messaging.MessageDispatcher>();
-            
-            var resolver = new CompositeActionResolver();
-            services.AddSingleton<IActionResolver>(provider => 
-            {
-                var dispatcher = provider.GetRequiredService<NPC.Library.Messaging.MessageDispatcher>();
-                var ctx = provider.GetRequiredService<ISpatialContext>();
-                resolver.AddResolver(new NPC.Village.Behaviors.VillageActuatorGroup(ctx, dispatcher));
-                return resolver;
-            });
+            var baseGroup = new NPC.Village.Behaviors.VillageActuatorGroup(spatialContext, new NPC.Library.Messaging.MessageDispatcher());
+            services.AddSingleton<NPC.Village.Behaviors.VillageActuatorGroup>(baseGroup);
 
             services.AddSingleton<StateMachine>();
             services.AddSingleton(provider => 
@@ -160,10 +155,7 @@ namespace NPC.Application
                 var machine = provider.GetRequiredService<StateMachine>();
                 var ctx = provider.GetRequiredService<ISpatialContext>();
                 var dispatcher = provider.GetRequiredService<NPC.Library.Messaging.MessageDispatcher>();
-                return new SimulationEngine(machine, ctx, dispatcher)
-                {
-                    SatietyDecayPerTick = 0.01m
-                };
+                return new SimulationEngine(machine, ctx, dispatcher);
             });
 
             services.AddSingleton<NPC.Library.Simulation.VisionTracker>();
@@ -192,7 +184,29 @@ namespace NPC.Application
                 var c = factory.Create();
                 c.Name = $"NPC {i + 1}";
                 
-                var mem = new NPC.Village.Memory.VillageMemory(wellLocation, doorLocations[i], chestLocations[i], bedLocations[i]);
+                var mem = new NPC.Village.Memory.VillageMemory((wellLocation.X, wellLocation.Y, 0), (doorLocations[i].X, doorLocations[i].Y, 0), (chestLocations[i].X, chestLocations[i].Y, 0), (bedLocations[i].X, bedLocations[i].Y, 0));
+                
+                // Pre-seed some knowledge so they don't start completely blind, with mild variation
+                var waterTiles = new List<(int X, int Y, int Z)>();
+                var treeTiles = new List<(int X, int Y, int Z)>();
+                for (int y = 0; y < map.Height; y++)
+                {
+                    for (int x = 0; x < map.Width; x++)
+                    {
+                        if (map.Tiles[x, y] == NPC.Library.Spatial.Grid.TileType.Water) waterTiles.Add((x, y, 0));
+                        if (map.Tiles[x, y] == NPC.Library.Spatial.Grid.TileType.AppleTree) treeTiles.Add((x, y, 0));
+                    }
+                }
+                
+                waterTiles = waterTiles.OrderBy(_ => Random.Shared.Next()).ToList();
+                treeTiles = treeTiles.OrderBy(_ => Random.Shared.Next()).ToList();
+                
+                int wCount = Math.Min(waterTiles.Count, Random.Shared.Next(1, 3));
+                for (int w = 0; w < wCount; w++) mem.Remember(NPC.Library.Spatial.Grid.TileType.Water, waterTiles[w]);
+                
+                int tCount = Math.Min(treeTiles.Count, Random.Shared.Next(2, 5));
+                for (int t = 0; t < tCount; t++) mem.Remember(NPC.Library.Spatial.Grid.TileType.AppleTree, treeTiles[t]);
+                
                 c.AddComponent<NPC.Library.Memory.IMemory>(mem);
                 
                 if (loadedGenetics != null && loadedGenetics.Count > 0)
@@ -210,6 +224,10 @@ namespace NPC.Application
                 inv.AddItem(new NPC.Library.Inventory.WaterBottleItem(0));
                 c.AddComponent<NPC.Library.Inventory.IInventory>(inv);
                 
+                var charResolver = new CompositeActionResolver();
+                charResolver.AddResolver(baseGroup);
+                c.AddComponent<NPC.Library.State.IActionResolver>(charResolver);
+                
                 if (aiSettings.IndividualOverrides.TryGetValue(c.Name, out var overrideConfig))
                 {
                     c.AddComponent(new NPC.Library.Character.Components.LLMComponent { Config = overrideConfig });
@@ -222,7 +240,7 @@ namespace NPC.Application
             {
                 var loc = bedLocations[i];
                 characters[i].AddComponent(new NPC.Library.Character.Components.BedComponent(loc.X, loc.Y));
-                spatialContext.MoveCharacter(characters[i], loc);
+                spatialContext.MoveCharacter(characters[i], (loc.X, loc.Y, 0));
 
                 // Add 2 empty water bottles to their chest
                 var chestLoc = chestLocations[i];

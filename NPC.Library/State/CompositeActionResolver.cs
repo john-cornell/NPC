@@ -18,6 +18,16 @@ public class CompositeActionResolver : IActionResolver
         _resolvers.Add(resolver);
     }
 
+    public void RemoveResolver(IActionResolver resolver)
+    {
+        _resolvers.Remove(resolver);
+    }
+
+    public void ClearResolvers()
+    {
+        _resolvers.Clear();
+    }
+
     public IEnumerable<IActuator> GetAvailableActuators(DriveType drive, Character character)
     {
         return _resolvers.SelectMany(r => r.GetAvailableActuators(drive, character));

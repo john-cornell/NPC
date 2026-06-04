@@ -3,7 +3,7 @@ namespace NPC.Library.Character;
 /// <summary>
 /// Runtime state for one NPC. Create via <see cref="CharacterFactory"/>.
 /// </summary>
-public sealed class Character
+public class Character
 {
     private readonly NPC.Library.Messaging.MessageDispatcher? _dispatcher;
 
@@ -22,7 +22,12 @@ public sealed class Character
     public string DeathReason { get; set; } = string.Empty;
     public int DeathTick { get; set; } = 0;
     public string LastAction { get; set; } = "None";
-    public (int X, int Y)? CurrentDestination { get; set; }
+    public (int X, int Y, int Z)? CurrentDestination { get; set; }
+    
+    /// <summary>
+    /// If true, the character recently passed out and gets tired quicker, but recovers fatigue quicker (simulating a bad sleep).
+    /// </summary>
+    public bool HasBadSleepModifier { get; set; } = false;
     
     private DriveType _targetDrive = DriveType.Idle;
     public DriveType TargetDrive 

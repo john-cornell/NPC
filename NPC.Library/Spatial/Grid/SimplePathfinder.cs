@@ -76,7 +76,7 @@ public class SimplePathfinder : IPathfinder
         {
             if (c.Item1 >= 0 && c.Item1 < _grid.Width && c.Item2 >= 0 && c.Item2 < _grid.Height)
             {
-                if (_grid.Tiles[c.Item1, c.Item2] != TileType.Water && _grid.Tiles[c.Item1, c.Item2] != TileType.Wall)
+                if (_grid.Tiles[c.Item1, c.Item2] != TileType.Water && _grid.Tiles[c.Item1, c.Item2] != TileType.Wall && _grid.Tiles[c.Item1, c.Item2] != TileType.CaveWall)
                 {
                     yield return c;
                 }

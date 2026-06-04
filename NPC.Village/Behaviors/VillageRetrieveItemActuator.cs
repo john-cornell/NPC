@@ -10,21 +10,21 @@ using System.Linq;
 using System.Threading.Tasks;
 using NPC.Library.Character;
 using NPC.Library.Inventory;
+using NPC.Library.Spatial;
 using NPC.Library.Spatial.Grid;
 using NPC.Library.State;
 
 public class VillageRetrieveItemActuator : IActuator
 {
-    private readonly GridSpatialContext _spatialContext;
+    private readonly ISpatialContext _spatialContext;
     private readonly ItemType _targetItem;
 
-    public VillageRetrieveItemActuator(GridSpatialContext spatialContext, ItemType targetItem)
+    public VillageRetrieveItemActuator(ISpatialContext spatialContext, ItemType targetItem)
     {
         _spatialContext = spatialContext;
         _targetItem = targetItem;
     }
 
-    public int GetPriority(Character character, DriveType currentDrive) => 75;
 
     public bool CanExecute(Character character)
     {
@@ -34,7 +34,8 @@ public class VillageRetrieveItemActuator : IActuator
             if (chestLocs.Count == 0) return false;
 
             var chestLoc = chestLocs.First();
-            if (_spatialContext.Map.Chests.TryGetValue(chestLoc, out var chestInv))
+            var chestInv = _spatialContext.GetChest(chestLoc);
+            if (chestInv != null)
             {
                 // Check if chest actually has the item
                 bool hasItem = chestInv.GetItems().Any(i => i.Type == _targetItem);
@@ -84,7 +85,8 @@ public class VillageRetrieveItemActuator : IActuator
         else
         {
             character.LastAction = $"Retrieving {_targetItem} from Chest";
-            if (_spatialContext.Map.Chests.TryGetValue(chestLoc, out var chestInv))
+            var chestInv = _spatialContext.GetChest(chestLoc);
+            if (chestInv != null)
             {
                 IItem? itemToTake = null;
                 if (_targetItem == ItemType.WaterBottle)

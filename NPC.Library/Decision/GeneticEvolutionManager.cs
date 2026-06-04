@@ -45,20 +45,38 @@ namespace NPC.Library.Decision
 
             // Elitism: The top performing networks survive directly to the next generation without mutation
             var elites = sortedPopulation.Take(_elitismCount).Select(p => p.Brain).ToList();
+            var theRest = sortedPopulation.Skip(_elitismCount).Select(p => p.Brain).ToList();
             
-            // Add exact clones of elites to preserve perfect behavior
+            // 1. Add exact clones of elites to preserve perfect behavior
             foreach (var elite in elites)
             {
                 nextGeneration.Add(elite.Clone());
             }
 
-            // Fill the rest of the population with mutated children from two parents
             Random random = new Random();
-            while (nextGeneration.Count < _populationSize)
+            
+            // 2. Crossover the elites with each other
+            // We'll generate as many elite children as there are elites (or up to population limit)
+            for (int i = 0; i < elites.Count && nextGeneration.Count < _populationSize; i++)
             {
-                // Randomly select two distinct parents from the elites
                 var parentA = elites[random.Next(elites.Count)];
                 var parentB = elites[random.Next(elites.Count)];
+                
+                var child = parentA.Crossover(parentB);
+                // Still apply mutation to elite children to allow exploration around optimal peaks
+                child.Mutate(_mutationRate, _mutationAmount);
+                nextGeneration.Add(child);
+            }
+
+            // 3. Fill the rest of the population with mutated children from the REST of the population
+            while (nextGeneration.Count < _populationSize)
+            {
+                // Fallback to elites if 'theRest' is somehow empty
+                var pool = theRest.Count > 0 ? theRest : elites;
+                
+                // Randomly select two distinct parents from the non-elites
+                var parentA = pool[random.Next(pool.Count)];
+                var parentB = pool[random.Next(pool.Count)];
                 
                 // Breed them via Crossover
                 var child = parentA.Crossover(parentB);

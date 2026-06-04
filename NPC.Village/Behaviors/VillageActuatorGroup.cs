@@ -32,10 +32,7 @@ public class VillageActuatorGroup : ActuatorGroup
             list.Add(new VillageGatherFoodActuator(_spatialContext));
             list.Add(new VillageGatherWaterActuator(_spatialContext));
             list.Add(new VillageSocializeActuator(_spatialContext, _dispatcher));
-            if (_spatialContext is NPC.Library.Spatial.Grid.GridSpatialContext gridCtx)
-            {
-                list.Add(new VillageStoreItemActuator(gridCtx));
-            }
+            list.Add(new VillageStoreItemActuator(_spatialContext));
         }
 
         if (targetDrive == DriveType.Social)
@@ -49,10 +46,7 @@ public class VillageActuatorGroup : ActuatorGroup
             list.Add(new SearchForFoodActuator(_spatialContext));
             list.Add(new VillageGatherFoodActuator(_spatialContext));
             list.Add(new EatActuator());
-            if (_spatialContext is NPC.Library.Spatial.Grid.GridSpatialContext gridCtx)
-            {
-                list.Add(new VillageRetrieveItemActuator(gridCtx, NPC.Library.Inventory.ItemType.Apple));
-            }
+            list.Add(new VillageRetrieveItemActuator(_spatialContext, NPC.Library.Inventory.ItemType.Apple));
         }
 
         if (targetDrive == DriveType.Thirst)
@@ -60,10 +54,7 @@ public class VillageActuatorGroup : ActuatorGroup
             list.Add(new SearchForFoodActuator(_spatialContext)); // Just wanders
             list.Add(new VillageGatherWaterActuator(_spatialContext));
             list.Add(new DrinkActuator());
-            if (_spatialContext is NPC.Library.Spatial.Grid.GridSpatialContext gridCtx)
-            {
-                list.Add(new VillageRetrieveItemActuator(gridCtx, NPC.Library.Inventory.ItemType.WaterBottle));
-            }
+            list.Add(new VillageRetrieveItemActuator(_spatialContext, NPC.Library.Inventory.ItemType.WaterBottle));
         }
 
         return list;

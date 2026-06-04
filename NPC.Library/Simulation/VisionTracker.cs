@@ -39,34 +39,32 @@ public class VisionTracker
         var loc = _spatialContext.GetCharacterLocation(character);
         if (loc == null) return;
 
-        // If the spatial context is a Grid, we can check surrounding tiles
-        if (_spatialContext is GridSpatialContext gridContext)
-        {
-            int cx = loc.Value.X;
-            int cy = loc.Value.Y;
-            var map = gridContext.Map;
+        int cx = loc.Value.X;
+        int cy = loc.Value.Y;
 
-            for (int y = Math.Max(0, cy - visionRadius); y <= Math.Min(map.Height - 1, cy + visionRadius); y++)
+        int cz = loc.Value.Z;
+
+        for (int y = cy - visionRadius; y <= cy + visionRadius; y++)
+        {
+            for (int x = cx - visionRadius; x <= cx + visionRadius; x++)
             {
-                for (int x = Math.Max(0, cx - visionRadius); x <= Math.Min(map.Width - 1, cx + visionRadius); x++)
+                var tile = _spatialContext.GetTile((x, y, cz));
+                // Record interesting things
+                if (tile == TileType.AppleTree)
                 {
-                    var tile = map.Tiles[x, y];
-                    // Record interesting things
-                    if (tile == TileType.AppleTree)
+                    if (_spatialContext.GetAppleCount((x, y, cz)) > 0)
                     {
-                        if (gridContext.GetAppleCount((x, y)) > 0)
-                        {
-                            memory.Remember(tile, (x, y));
-                        }
-                        else
-                        {
-                            memory.Forget(tile, x, y);
-                        }
+                        memory.Remember(tile, (x, y, cz));
                     }
-                    else if (tile == TileType.Water)
+                    else
                     {
-                        memory.Remember(tile, (x, y));
+                        // memory.Forget only supports x, y, we'll need to pass Z if we update IMemory
+                        memory.Forget(tile, x, y, cz); 
                     }
+                }
+                else if (tile == TileType.Water)
+                {
+                    memory.Remember(tile, (x, y, cz));
                 }
             }
         }

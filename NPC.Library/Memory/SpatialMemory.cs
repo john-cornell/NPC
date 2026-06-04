@@ -9,34 +9,34 @@ using NPC.Library.Spatial.Grid;
 /// </summary>
 public class SpatialMemory : IMemory
 {
-    private readonly Dictionary<TileType, HashSet<(int X, int Y)>> _memory = new();
+    private readonly Dictionary<TileType, HashSet<(int X, int Y, int Z)>> _memory = new();
 
-    public void Remember(TileType type, (int X, int Y) location)
+    public void Remember(TileType type, (int X, int Y, int Z) location)
     {
         if (!_memory.TryGetValue(type, out var locations))
         {
-            locations = new HashSet<(int X, int Y)>();
+            locations = new HashSet<(int X, int Y, int Z)>();
             _memory[type] = locations;
         }
 
         locations.Add(location);
     }
 
-    public void Forget(TileType type, int x, int y)
+    public void Forget(TileType type, int x, int y, int z)
     {
         if (_memory.TryGetValue(type, out var locations))
         {
-            locations.Remove((x, y));
+            locations.Remove((x, y, z));
         }
     }
 
-    public IEnumerable<(int X, int Y)> Recall(TileType type)
+    public IEnumerable<(int X, int Y, int Z)> Recall(TileType type)
     {
         if (_memory.TryGetValue(type, out var locations))
         {
             return locations;
         }
-        return Enumerable.Empty<(int X, int Y)>();
+        return Enumerable.Empty<(int X, int Y, int Z)>();
     }
 
     public IDictionary<string, double> GetTunableParameters()

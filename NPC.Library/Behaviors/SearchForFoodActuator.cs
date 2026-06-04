@@ -14,7 +14,6 @@ public class SearchForFoodActuator : IActuator
         _spatialContext = spatialContext;
     }
 
-    public int GetPriority(NPC.Library.Character.Character character, DriveType currentDrive) => 10;
 
     public bool CanExecute(NPC.Library.Character.Character character)
     {

@@ -19,6 +19,10 @@ namespace NPC.UI.Isometric
         private Camera2D _camera;
         private CharacterUIOverlay _uiOverlay = new();
         
+        // Log Deletion State
+        private int _logDeleteMode = 2; // 0=All(1), 1=Keep1, 2=Keep2, 3=Keep5
+        private string _deleteStatus = "";
+        
         // Isometric parameters
         private const int TileWidth = 64; // Since assets are 128x128, the "floor" diamond is roughly 128x64 or 64x32
         private const int TileHeight = 32;
@@ -213,7 +217,7 @@ namespace NPC.UI.Isometric
                 {
                     string objTex = map.Tiles[x, y] switch
                     {
-                        TileType.AppleTree => gridCtx.GetAppleCount((x, y)) > 0 ? "iso_tree_apple" : "iso_tree_empty",
+                        TileType.AppleTree => gridCtx.GetAppleCount((x, y, 0)) > 0 ? "iso_tree_apple" : "iso_tree_empty",
                         TileType.Door => "iso_door_tile",
                         TileType.Chest => "iso_chest_tile",
                         TileType.Bed => "iso_bed_tile",
@@ -261,7 +265,7 @@ namespace NPC.UI.Isometric
                     
                     string charTex = (charIdx % 2 == 0) ? "iso_villager_farmer" : "iso_villager_baker";
                     float scale = 0.5f;
-                    float yOffset = bounceOffset + 16f;
+                    float yOffset = bounceOffset; // Centered
 
                     if (character.IsDead)
                     {
@@ -273,7 +277,7 @@ namespace NPC.UI.Isometric
                     {
                         charTex = (charIdx % 2 == 0) ? "iso_villager_farmer_sleeping" : "iso_villager_baker_sleeping";
                         scale = 0.5f;
-                        yOffset = 16f;
+                        yOffset = 0f; // Centered
                     }
                     
                     if (!_textures.TryGetValue(charTex, out var tex)) continue;
@@ -487,6 +491,57 @@ namespace NPC.UI.Isometric
                             
                             NPC.Application.AISettingsManager.SaveSettings(aiSettings);
                             _globalTestStatus = "Settings Saved Successfully!";
+                        }
+
+                        ImGui.EndTabItem();
+                    }
+                    if (ImGui.BeginTabItem("Data Management"))
+                    {
+                        ImGui.Text("Genetic Training Logs");
+                        ImGui.Separator();
+
+                        ImGui.Combo("Deletion Mode", ref _logDeleteMode, "All (Except Current)\0Keep Latest 1\0Keep Latest 2\0Keep Latest 5\0");
+                        
+                        if (ImGui.Button("Delete Logs"))
+                        {
+                            _deleteStatus = "Deleting...";
+                            System.Threading.Tasks.Task.Run(() => {
+                                try {
+                                    string logsDir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ApplicationData), "NPC", "GeneticLogs");
+                                    if (Directory.Exists(logsDir))
+                                    {
+                                        var runDirs = Directory.GetDirectories(logsDir).OrderByDescending(d => d).ToList();
+                                        
+                                        // Determine how many of the newest runs to KEEP
+                                        int skipCount = _logDeleteMode switch {
+                                            0 => 1, // All (Except Current)
+                                            1 => 1, // Keep Latest 1
+                                            2 => 2, // Keep Latest 2
+                                            3 => 5, // Keep Latest 5
+                                            _ => 2
+                                        };
+
+                                        var toDelete = runDirs.Skip(skipCount).ToList();
+                                        foreach (var dir in toDelete)
+                                        {
+                                            Directory.Delete(dir, true);
+                                        }
+                                        
+                                        _deleteStatus = $"Deleted {toDelete.Count} old log folders.";
+                                    }
+                                    else
+                                    {
+                                        _deleteStatus = "Logs directory not found.";
+                                    }
+                                } catch (Exception ex) {
+                                    _deleteStatus = $"Error: {ex.Message}";
+                                }
+                            });
+                        }
+                        
+                        if (!string.IsNullOrEmpty(_deleteStatus))
+                        {
+                            ImGui.TextWrapped(_deleteStatus);
                         }
 
                         ImGui.EndTabItem();

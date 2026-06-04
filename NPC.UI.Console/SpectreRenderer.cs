@@ -40,7 +40,7 @@ public class SpectreRenderer : IRenderer
         int id = 1;
         foreach (var character in state.SpatialContext.GetCharacters())
         {
-            var pos = state.SpatialContext.GetCharacterLocation(character).GetValueOrDefault((0, 0));
+            var pos = state.SpatialContext.GetCharacterLocation(character).GetValueOrDefault((0, 0, 0));
             var drives = character.Drives.Levels;
             
             string satietyStr = character.Drives.TryGetLevel(DriveType.Satiety, out var s) ? $"{s:P0}" : "-";
@@ -85,7 +85,7 @@ public class SpectreRenderer : IRenderer
         foreach (var character in state.SpatialContext.GetCharacters())
         {
             var pos = state.SpatialContext.GetCharacterLocation(character);
-            if (pos != null) charsByPos[pos.Value] = character;
+            if (pos != null) charsByPos[(pos.Value.X, pos.Value.Y)] = character;
         }
 
         int startX = Math.Max(-1, Math.Min(state.CameraX, map.Width - state.CameraWidth + 1));
@@ -130,7 +130,7 @@ public class SpectreRenderer : IRenderer
                         }
                         else
                         {
-                            int apples = gridContext.GetAppleCount((x, y));
+                            int apples = gridContext.GetAppleCount((x, y, 0));
                             if (apples > 0)
                                 gridStr.Append("[red]T[/]");
                             else
@@ -178,7 +178,7 @@ public class SpectreRenderer : IRenderer
         {
             var charsList = state.SpatialContext.GetCharacters().ToList();
             var charId = charsList.IndexOf(state.SelectedCharacter) + 1;
-            var pos = state.SpatialContext.GetCharacterLocation(state.SelectedCharacter).GetValueOrDefault((0, 0));
+            var pos = state.SpatialContext.GetCharacterLocation(state.SelectedCharacter).GetValueOrDefault((0, 0, 0));
             var drives = state.SelectedCharacter.Drives.Levels;
             
             var statsStr = new StringBuilder();
@@ -254,7 +254,7 @@ public class SpectreRenderer : IRenderer
                     statsStr.AppendLine("[bold]Home Chest[/]");
                     statsStr.AppendLine();
                     var chestLocs = mem.Recall(TileType.Chest).ToList();
-                    if (chestLocs.Any() && gridContext != null && gridContext.Map.Chests.TryGetValue(chestLocs[0], out var chestInv))
+                    if (chestLocs.Any() && gridContext != null && gridContext.Map.Chests.TryGetValue((chestLocs[0].X, chestLocs[0].Y), out var chestInv))
                     {
                         var chestItems = chestInv.GetItems().ToList();
                         if (!chestItems.Any()) statsStr.AppendLine("[grey]Empty[/]");
@@ -303,7 +303,7 @@ public class SpectreRenderer : IRenderer
         if (state.SelectedTree.HasValue)
         {
             var treePos = state.SelectedTree.Value;
-            var apples = gridContext.GetAppleCount(treePos);
+            var apples = gridContext.GetAppleCount((treePos.X, treePos.Y, 0));
             
             var treeStr = new StringBuilder();
             treeStr.AppendLine($"[bold cyan]Apple Tree[/] at ({treePos.X}, {treePos.Y})");
